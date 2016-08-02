@@ -21,12 +21,10 @@ static pixMap* pixMap_init(){
 pixMap* pixMap_init_filename(char *filename){
 	
 	pixMap *p = pixMap_init();
-	//goes to read_pixMap and does the work there.
-	pixMap_read(p,filename);		
+	pixMap_read(p,filename);
+	//pixMap *temp = pixMap_init();
+	//pixMap_copy(temp, p);		
 	return p;
-	//use pixMap_int to create the pixMap object
-	//use pixMap read to fill the fields of the object
-	//return the pointer to the new object
 }
 static int pixMap_read(pixMap *p,char *filename){
 	 
@@ -39,73 +37,76 @@ static int pixMap_read(pixMap *p,char *filename){
 	p->pixArray[0] = (rgba*) p->image;
 	for(int i = 1; i<p->height; i++) {
 		p->pixArray[i] = (p->pixArray[i-1])+(p->width);
-	}
- //read and allocate image, read in width and height using using lodepng_decode32_file// look at this!!!
- //example is in lodepng/examples - one liner
-	//then allocate p->pixArray to hold p->height pointers
-	//set p->pixArray[0] to p->image and p->pixArray[i]=p->pixArray[i-1]+p->width
-	
+	}	
 	return 0;
 }	
 static void pixMap_copy(pixMap *dest,pixMap *source){
+	fprintf(stderr, "COPY SOURCE\n");
 	//if source image is zero then reset dest and copy width and height
-	if(!source) {
+	if(!source->image) {
 		dest->height = 0;
 		dest->width = 0;
 		dest->image = 0;
 		dest->pixArray = 0;
 	}
 		//if source image is not zero
-	if(source) {
+	else {
 		
 	  //if width or height are different
 		if(dest->height != source->height || dest->width != source->width){
-		//if width*height is different then we need to allocate dest->image	
+		//if width*height is different then we need to allocate dest->image			
 			if((dest->height)*(dest->width) != (source->height)*(source->width)) {
 			
 			//if dest->image is zero use malloc to allocate memory for dest->image	
 				if(dest->image ==0) {
-					dest->image = malloc((source->height)*(source->width)*4);
+					fprintf(stderr, "Dest Image = 0\n");
+					dest->image = malloc((source->height)*(source->width)*sizeof(rgba));
+					//fprintf(stderr, "dest->image %d\n", dest->image);
 					
 				} 
 				//else use realloc to allocate memory dest->image
-				else { dest->image = realloc(source->image,(source->height)*(source->width)*4);
+				else { dest->image = realloc(dest->image,(source->height)*(source->width)*sizeof(rgba));
+					fprintf(stderr, "Dest Image realloc\n");
 				//if dest->height is different
 				}
+			}
+		}	
 				if(dest->height != source->height) {
 					if(!dest->pixArray) {
+						fprintf(stderr, "!dest->pixArray\n");
 						//malloc or realloc dest->pixArray depending on whether dest->pixArray is zero
-						dest->pixArray = malloc(sizeof(source->pixArray));
+						dest->pixArray = malloc(source->height*sizeof(rgba*));
 						 //even if the height is the same set dest->pixArray[0] to dest->image and dest->pixArray[i]=dest->pixArray[i-1]+source->width
-						dest->pixArray[0] = (rgba*) dest->image;
-						for(int i = 1; i<source->height; i++) {
-							dest->pixArray[i] = dest->pixArray[i-1]+dest->width;
+						
+						
+					}
+					
+					else {
+						fprintf(stderr, "dest->pixArray\n");
+						dest->pixArray = realloc(dest->pixArray, source->height * sizeof(rgba*));
+						
+											
 						}
 					}
-					if(dest->pixArray) {
-						dest->pixArray = realloc(dest->pixArray, sizeof(source->pixArray));
-						dest->pixArray[0] = (rgba*) dest->image;
-						for(int i = 1; i<source->height; i++) {
-							dest->pixArray[i] = dest->pixArray[i-1]+dest->width;
-							}
-						
-						}
-					
 				}
-			}
+			
+			
+		dest->pixArray[0] = (rgba*) dest->image;
+		for(int i = 1; i<source->height; i++) {
+			dest->pixArray[i] = dest->pixArray[i-1]+dest->width;
 		}
 	
    
 	  //do a memcpy from source->image to dest->image
 	  //set dest->width and dest->height to source values
 	//
-	memcpy(dest->image, source->image, ((source->height)*(source->width)*4)); 
+	memcpy(dest->image, source->image, ((source->height)*(source->width))*4); 
 	dest->width = source->width;
 	dest->height = source->height;
 	
 	}	
 	
-}
+
 
 static void pixMap_reset(pixMap *p){
 	
@@ -142,27 +143,30 @@ memset(temp->image, 0, (p->height)*(p->width)*4);
  //double x=(temp->width)/2;
  //double y=(temp->height)/2;
 
-int ox=(temp->width)/2;
-int oy=(temp->height)/2;
-fprintf(stderr, "X: %d\nY:%d\n", ox,oy);
+int ox=(int)(temp->width)/2;
+int oy=(int)(temp->height)/2;
+//fprintf(stderr, "X: %d\nY:%d\n", ox,oy);
  
  //calculate the values of sine and cosine used by the rotation formula 
 
 	for(int y=0;y<p->height;y++){   //two for loops to loop through each pixel in the original
 		for(int x=0;x<p->width;x++){
-			float rads = degreesToRadians(theta);
+			float rads = degreesToRadians(-theta);
 			double c = cos(rads);
 			double s = sin(rads);
 			
-			int rotx = (float)c*(x-ox) -s *(oy-y) +ox +0.5;
-			int roty =(float) -(s*(x-ox) + c *(oy-y) -oy) +0.5;
-			fprintf(stderr, "new x: %d\nNew y: %d",rotx,roty);
+			float rotx = c*(x-ox) -s *(oy-y) +ox;
+			float roty = -(s*(x-ox) + c *(oy-y) -oy);
+			//fprintf(stderr, "Old x: %d\nOld y: %d\n",x,y);
+			//fprintf(stderr, "new x: %.4f\nNew y: %.4f\n",rotx,roty);
 			//check if the new x and y are within the confines of the image
-			
-			if(roty < temp->height && rotx <temp->width){
-			
-			//	if(temp->pixArray[roty]+rotx < temp->height) {
-			memcpy(temp->pixArray[roty]+rotx,p->pixArray[y]+x,sizeof(rgba));
+			//fprintf(stderr, "%d\n" ,(temp->pixArray[roty][rotx]).r);
+			int rotateX = (int)(rotx +0.5);
+			int rotateY = (int)(roty +0.5);
+			//fprintf(stderr, "NEWEST x: %d\nNEWEST y: %d\n",rotateX,rotateY);
+			if((rotateY < (p->height) && rotateY >=0) && ((rotateX < (p->width) ) && rotateX >=0)){		
+				//memcpy(temp->pixArray[y]+x, p->pixArray[rotateY] + rotateX,sizeof(rgba));
+				memcpy(temp->pixArray[rotateY]+rotateX,p->pixArray[y]+x,(sizeof(rgba)*4));
 		}
 		
 		}
@@ -188,16 +192,22 @@ void pixMap_gray (pixMap *p){
 	//for() loop through pixels using two for loops 
 	for(int i=0; i<((p->height)); i++) {
 		
-		for(int j=0; j<((p->width)*4); j++) {
-			fprintf(stderr, "Red %d\nGreen %d\nBlue %d\n", p->pixArray[i][j].r, p->pixArray[i][j].g, p->pixArray[i][j].b);
+		for(int j=0; j<((p->width)); j++) {
+			//fprintf(stderr, "Red %d\nGreen %d\nBlue %d\n", p->pixArray[i][j].r, p->pixArray[i][j].g, p->pixArray[i][j].b);
 			float r = p->pixArray[i][j].r;
+			//printf(stderr, "RED %d\n", p->pixArray[i][j].r);
 			float g = p->pixArray[i][j].g;
+			//fprintf(stderr, "GREEN %d\n", p->pixArray[i][j].g);
 			float b = p->pixArray[i][j].b; 
+			//fprintf(stderr, "BLUE %d\n", p->pixArray[i][j].b);
 			int gray = ((r+g+b)/3) +0.5;
 			p->pixArray[i][j].r = gray;
+			//fprintf(stderr, "RED Gray %d\n", p->pixArray[i][j].r);
 			p->pixArray[i][j].g = gray;
+			//fprintf(stderr, "GREEN Gray %d\n", p->pixArray[i][j].g);
 			p->pixArray[i][j].b = gray;
-			fprintf(stderr, "AFTER GRAY!! Red %d\nGreen %d\nBlue %d\n", p->pixArray[i][j].r, p->pixArray[i][j].g, p->pixArray[i][j].b);
+			//fprintf(stderr, "BLUE GRAY %d\n", p->pixArray[i][j].b);
+			//fprintf(stderr, "AFTER GRAY!! Red %d\nGreen %d\nBlue %d\n", p->pixArray[i][j].r, p->pixArray[i][j].g, p->pixArray[i][j].b);
 		}
 	}
 			
